@@ -1,0 +1,2 @@
+[console_scripts]
+paperpods = paperpods.cli:app
