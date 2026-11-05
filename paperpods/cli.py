@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import typer
@@ -8,6 +9,7 @@ from .app import build_pipeline
 from .config import load_settings
 from .storage import JobStore
 
+logger = logging.getLogger("paperpods")
 app = typer.Typer(help="PaperPods: scientific-paper to podcast-script/audio CLI.")
 
 
@@ -24,8 +26,14 @@ def process(
         "conceptual-plus-key-variables",
         help="Formula policy (conceptual-plus-key-variables, high-level-only, detailed-derivation-summary).",
     ),
+    quiet: bool = typer.Option(False, "--quiet", help="Suppress high-level progress logs."),
 ) -> None:
+    log_level = logging.WARNING if quiet else logging.INFO
+    logging.basicConfig(level=log_level, format="%(message)s")
+    logger.setLevel(log_level)
+
     settings = load_settings()
+    logger.info("Loading PaperPods settings from environment.")
     pipeline = build_pipeline(settings)
     try:
         result = pipeline.process(

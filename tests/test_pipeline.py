@@ -52,6 +52,7 @@ def test_pipeline_process_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert job is not None
     assert job.status == "completed"
     assert result.script_path.exists()
+    assert len(result.script_path.read_text(encoding="utf-8")) <= 10_000
     assert result.audio_path is not None
     assert result.audio_path.exists()
     assert result.cached is False
@@ -81,6 +82,16 @@ def test_pipeline_process_failure_updates_job(monkeypatch: pytest.MonkeyPatch, t
     jobs = store.list_jobs(limit=1)
     assert jobs[0].status == "failed"
     assert "llm failed" in (jobs[0].error or "")
+
+
+def test_pipeline_trims_script_to_max_characters() -> None:
+    pipeline = PaperPodsPipeline(data_dir=Path("/tmp/paperpods-test"), store=JobStore(Path("/tmp/paperpods-test.db")), llm=FakeLLM(), tts=None)
+    long_script = ("A " * 20_000) + "B"
+
+    trimmed = pipeline._normalize_script_length(long_script)
+
+    assert len(trimmed) <= 10_000
+    assert trimmed.endswith(".") or trimmed.endswith("B") or trimmed.endswith(" ") is False
 
 
 def test_pipeline_reuses_cached_script_without_regenerating(

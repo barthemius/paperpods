@@ -5,6 +5,7 @@ description = "Turn scientific papers into expert-level listenable podcast scrip
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "fonttools>=4.54.0",
   "openai>=1.40.0",
   "python-dotenv>=1.0.0",
   "pypdf>=5.0.0",

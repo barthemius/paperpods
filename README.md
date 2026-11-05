@@ -1,13 +1,24 @@
 # PaperPods
 
-PaperPods is an open-source, **CLI-first** tool that turns scientific PDFs into expert-level podcast scripts and optional ElevenLabs audio.
+PaperPods is an open-source, **CLI-first** tool for busy scientists who want to keep up with research without spending large chunks of time reading papers at a desk.
+
+It turns a PDF into an expert-level, audio-ready podcast script and optional spoken audio, so you can listen while commuting, doing chores, walking, or working out. The goal is simple: make secondary reading frictionless without flattening the scientific content into a dumbed-down summary.
+
+## Why this exists
+
+Researchers often discover interesting papers while browsing, but cannot always sit down and read them in depth. A growing part of the day is spent in transit, cleaning, cooking, or other low-attention tasks. PaperPods is built for that reality:
+
+- listen to the gist and key contributions while driving
+- hear the method and limitations explained in expert language
+- keep the math meaningful by translating formulas into spoken English
+- keep the content at a technical level suitable for researchers, not trivialized summaries
 
 ## What it does
 
 - Extracts paper text from PDF files
 - Uses an LLM to produce a 15–20 minute expert narration script
 - Explains equation intent conceptually and defines key variables
-- Optionally renders MP3 audio via ElevenLabs
+- Renders MP3 audio via ElevenLabs for listenability
 - Stores local job history and artifacts for reproducibility
 - Reuses cached results for identical paper + generation settings
 
@@ -19,6 +30,8 @@ PaperPods is an open-source, **CLI-first** tool that turns scientific PDFs into 
 ```bash
 pip install -e ".[dev]"
 ```
+
+This includes `fonttools`, which is required for robust PDF font decoding during text extraction.
 
 3. Create local env file and fill credentials:
 

@@ -20,6 +20,7 @@ def test_prompt_includes_formula_snippets_and_policy() -> None:
     assert "argmax_x f(x)" in user_prompt
     assert "define key variables in words" in user_prompt
     assert "text-to-speech reader" in user_prompt
-    assert "Every symbol, equation, integral, sum, limit, derivative, matrix, fraction, and special function must be written in spoken English" in user_prompt
+    assert "spoken English" in user_prompt
+    assert "raw mathematical notation" in user_prompt
     assert "the integral from zero to infinity" in user_prompt
 

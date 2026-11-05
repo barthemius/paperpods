@@ -50,6 +50,7 @@ Constraints:
 - Avoid hallucinating results not in the source.
 - Include: motivation, method, core equations explained in words, main results, limitations, and practical implications.
 - Use plain spoken prose suitable for text-to-speech.
+- Keep the final script under 10,000 characters total.
 - Every symbol, equation, integral, sum, limit, derivative, matrix, fraction, vector, tensor and special function must be written in spoken English, never as raw mathematical notation.
 - Replace raw mathematical notation with explicit verbal descriptions such as:
   - "the integral from zero to infinity"

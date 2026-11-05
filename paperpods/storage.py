@@ -114,10 +114,6 @@ class JobStore:
         self,
         *,
         pdf_sha256: str,
-        provider: str,
-        model: str,
-        style: str,
-        formula_policy: str,
         require_audio: bool,
     ) -> JobRecord | None:
         with self._connect() as conn:
@@ -126,14 +122,10 @@ class JobStore:
                 SELECT * FROM jobs
                 WHERE status = 'completed'
                   AND pdf_sha256 = ?
-                  AND provider = ?
-                  AND model = ?
-                  AND style = ?
-                  AND formula_policy = ?
                   AND script_path IS NOT NULL
                 ORDER BY created_at DESC
                 """,
-                (pdf_sha256, provider, model, style, formula_policy),
+                (pdf_sha256,),
             ).fetchall()
 
         for row in rows:
