@@ -91,7 +91,54 @@ def test_pipeline_trims_script_to_max_characters() -> None:
     trimmed = pipeline._normalize_script_length(long_script)
 
     assert len(trimmed) <= 10_000
-    assert trimmed.endswith(".") or trimmed.endswith("B") or trimmed.endswith(" ") is False
+    assert trimmed.endswith(".") or trimmed.endswith("B") or trimmed.endswith(" ") is not True
+
+
+def test_delete_hanging_jobs_removes_incomplete_records(tmp_path: Path) -> None:
+    store = JobStore(tmp_path / "paperpods.db")
+
+    good_id = store.create_job(
+        pdf_path=tmp_path / "good.pdf",
+        pdf_sha256="goodhash",
+        title="Good",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+    store.update_job(good_id, status="completed", script_path=tmp_path / "good.txt", audio_path=tmp_path / "good.mp3")
+
+    dangling_id_1 = store.create_job(
+        pdf_path=tmp_path / "dangling-1.pdf",
+        pdf_sha256="danglinghash1",
+        title="Dangling 1",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+    store.update_job(dangling_id_1, status="failed")
+
+    dangling_id_2 = store.create_job(
+        pdf_path=tmp_path / "dangling-2.pdf",
+        pdf_sha256="danglinghash2",
+        title="Dangling 2",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+    store.update_job(dangling_id_2, status="running")
+
+    remaining = store.list_jobs(limit=50)
+    assert len(remaining) == 3
+
+    removed = store.delete_hanging_jobs()
+
+    assert removed == 2
+    assert store.get_job(good_id) is not None
+    assert store.get_job(dangling_id_1) is None
+    assert store.get_job(dangling_id_2) is None
 
 
 def test_pipeline_reuses_cached_script_without_regenerating(
@@ -153,3 +200,28 @@ def test_pipeline_generates_missing_audio_from_cached_script(
     assert with_audio.job_id == script_only.job_id
     assert with_audio.audio_path is not None
     assert with_audio.audio_path.exists()
+
+
+def test_pipeline_uses_human_readable_artifact_names(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from paperpods import pipeline as pipeline_module
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_pdf_text",
+        lambda _path: ExtractedPaper(
+            title="A Deep Study of Neural Dynamics",
+            text="Paper content",
+            formula_snippets=[],
+        ),
+    )
+
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    store = JobStore(tmp_path / "paperpods.db")
+    pipeline = PaperPodsPipeline(data_dir=tmp_path, store=store, llm=FakeLLM(), tts=FakeTTS())
+
+    result = pipeline.process(pdf_path=pdf_path, generate_audio=True)
+
+    assert result.script_path.name == "a_deep_study_of_neural_dynamics.txt"
+    assert result.audio_path is not None
+    assert result.audio_path.name == "a_deep_study_of_neural_dynamics.mp3"
