@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -84,6 +85,31 @@ def test_pipeline_process_failure_updates_job(monkeypatch: pytest.MonkeyPatch, t
     assert "llm failed" in (jobs[0].error or "")
 
 
+def test_pipeline_marks_job_running_before_extraction(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from paperpods import pipeline as pipeline_module
+
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    store = JobStore(tmp_path / "paperpods.db")
+    observed_status: dict[str, str | None] = {"status": None}
+
+    def fake_extract(_path: Path) -> ExtractedPaper:
+        jobs = store.list_jobs(limit=1)
+        observed_status["status"] = jobs[0].status if jobs else None
+        return ExtractedPaper(
+            title="Paper",
+            text="Paper content",
+            formula_snippets=[],
+        )
+
+    monkeypatch.setattr(pipeline_module, "extract_pdf_text", fake_extract)
+    pipeline = PaperPodsPipeline(data_dir=tmp_path, store=store, llm=FakeLLM(), tts=None)
+
+    pipeline.process(pdf_path=pdf_path, generate_audio=False)
+
+    assert observed_status["status"] == "running"
+
+
 def test_pipeline_trims_script_to_max_characters() -> None:
     pipeline = PaperPodsPipeline(data_dir=Path("/tmp/paperpods-test"), store=JobStore(Path("/tmp/paperpods-test.db")), llm=FakeLLM(), tts=None)
     long_script = ("A " * 20_000) + "B"
@@ -91,7 +117,81 @@ def test_pipeline_trims_script_to_max_characters() -> None:
     trimmed = pipeline._normalize_script_length(long_script)
 
     assert len(trimmed) <= 10_000
-    assert trimmed.endswith(".") or trimmed.endswith("B") or trimmed.endswith(" ") is False
+    assert trimmed == trimmed.rstrip()
+
+
+def test_delete_hanging_jobs_removes_incomplete_records(tmp_path: Path) -> None:
+    store = JobStore(tmp_path / "paperpods.db")
+
+    good_id = store.create_job(
+        pdf_path=tmp_path / "good.pdf",
+        pdf_sha256="goodhash",
+        title="Good",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+    store.update_job(good_id, status="completed", script_path=tmp_path / "good.txt", audio_path=tmp_path / "good.mp3")
+
+    dangling_id_1 = store.create_job(
+        pdf_path=tmp_path / "dangling-1.pdf",
+        pdf_sha256="danglinghash1",
+        title="Dangling 1",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+    store.update_job(dangling_id_1, status="failed")
+
+    stale_queued_id = store.create_job(
+        pdf_path=tmp_path / "queued-stale.pdf",
+        pdf_sha256="queuedstalehash",
+        title="Queued stale",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+    with store._connect() as conn:
+        conn.execute(
+            "UPDATE jobs SET updated_at = ? WHERE id = ?",
+            ((datetime.now(UTC) - timedelta(minutes=30)).isoformat(), stale_queued_id),
+        )
+
+    dangling_id_2 = store.create_job(
+        pdf_path=tmp_path / "dangling-2.pdf",
+        pdf_sha256="danglinghash2",
+        title="Dangling 2",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+    store.update_job(dangling_id_2, status="running")
+
+    fresh_queued_id = store.create_job(
+        pdf_path=tmp_path / "queued-fresh.pdf",
+        pdf_sha256="queuedfreshhash",
+        title="Queued fresh",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+
+    remaining = store.list_jobs(limit=50)
+    assert len(remaining) == 5
+
+    removed = store.delete_hanging_jobs()
+
+    assert removed == 1
+    assert store.get_job(good_id) is not None
+    assert store.get_job(dangling_id_1) is not None
+    assert store.get_job(dangling_id_2) is not None
+    assert store.get_job(stale_queued_id) is None
+    assert store.get_job(fresh_queued_id) is not None
 
 
 def test_pipeline_reuses_cached_script_without_regenerating(
@@ -153,3 +253,28 @@ def test_pipeline_generates_missing_audio_from_cached_script(
     assert with_audio.job_id == script_only.job_id
     assert with_audio.audio_path is not None
     assert with_audio.audio_path.exists()
+
+
+def test_pipeline_uses_human_readable_artifact_names(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from paperpods import pipeline as pipeline_module
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_pdf_text",
+        lambda _path: ExtractedPaper(
+            title="A Deep Study of Neural Dynamics",
+            text="Paper content",
+            formula_snippets=[],
+        ),
+    )
+
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    store = JobStore(tmp_path / "paperpods.db")
+    pipeline = PaperPodsPipeline(data_dir=tmp_path, store=store, llm=FakeLLM(), tts=FakeTTS())
+
+    result = pipeline.process(pdf_path=pdf_path, generate_audio=True)
+
+    assert result.script_path.name == "a_deep_study_of_neural_dynamics.txt"
+    assert result.audio_path is not None
+    assert result.audio_path.name == "a_deep_study_of_neural_dynamics.mp3"

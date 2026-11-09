@@ -20,15 +20,21 @@ Researchers often discover interesting papers while browsing, but cannot always 
 - Explains equation intent conceptually and defines key variables
 - Renders MP3 audio via ElevenLabs for listenability
 - Stores local job history and artifacts for reproducibility
-- Reuses cached results for identical paper + generation settings
+- Reuses cached results for the same paper
+- Names generated files by article title instead of opaque hashes when possible
 
 ## Quick start
 
-1. Create and activate a virtual environment.
-2. Install dependencies:
+1. Install uv if you do not already have it:
 
 ```bash
-pip install -e ".[dev]"
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+2. Install dependencies for the project:
+
+```bash
+uv sync --extra dev
 ```
 
 This includes `fonttools`, which is required for robust PDF font decoding during text extraction.
@@ -40,15 +46,22 @@ cp .env.example .env
 # then edit .env with your keys
 ```
 
-4. Run:
+4. Run the project without Poetry:
 
 ```bash
-paperpods process ./my-paper.pdf --audio
+uv run paperpods process ./my-paper.pdf --audio
+```
+
+If you want the `paperpods` command available directly in your shell:
+
+```bash
+uv tool install --editable .
 ```
 
 ## CLI commands
 
 - `paperpods process <pdf_path> [--title ...] [--audio]`
+- `paperpods tui` Open a lightweight browser for generated scripts and MP3s.
 - `paperpods status <job_id>`
 - `paperpods list-jobs`
 - `paperpods show-script <job_id> [--print-content]`
@@ -70,5 +83,5 @@ PaperPods fingerprints each PDF and reuses existing script/audio artifacts from 
 
 ## Notes
 
-- Current implementation is CLI-first and structured for future TUI extension.
+- The project includes a lightweight terminal UI for browsing generated scripts and audio files.
 - Provider abstraction is in place; OpenAI is the first concrete LLM backend.

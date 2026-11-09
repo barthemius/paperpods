@@ -77,6 +77,7 @@ class JobStore:
         job_id: str,
         *,
         status: str,
+        title: str | None = None,
         script_path: Path | None = None,
         audio_path: Path | None = None,
         error: str | None = None,
@@ -85,11 +86,17 @@ class JobStore:
             conn.execute(
                 """
                 UPDATE jobs
-                SET status = ?, script_path = COALESCE(?, script_path), audio_path = COALESCE(?, audio_path), error = ?, updated_at = ?
+                SET status = ?,
+                    title = COALESCE(?, title),
+                    script_path = COALESCE(?, script_path),
+                    audio_path = COALESCE(?, audio_path),
+                    error = ?,
+                    updated_at = ?
                 WHERE id = ?
                 """,
                 (
                     status,
+                    title,
                     str(script_path) if script_path else None,
                     str(audio_path) if audio_path else None,
                     error,
@@ -136,6 +143,22 @@ class JobStore:
                 continue
             return job
         return None
+
+    def delete_hanging_jobs(self, *, stale_minutes: int = 10) -> int:
+        stale_cutoff = datetime.now(UTC).timestamp() - (stale_minutes * 60)
+        stale_cutoff_iso = datetime.fromtimestamp(stale_cutoff, tz=UTC).isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM jobs
+                WHERE script_path IS NULL
+                  AND audio_path IS NULL
+                  AND status = 'queued'
+                  AND updated_at <= ?
+                """,
+                (stale_cutoff_iso,),
+            )
+            return cursor.rowcount
 
 
 def _row_to_job(row: sqlite3.Row) -> JobRecord:

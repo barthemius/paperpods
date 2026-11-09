@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -35,6 +36,15 @@ class PaperPodsPipeline:
         self._audio_dir = self._data_dir / "audio"
         self._script_dir.mkdir(parents=True, exist_ok=True)
         self._audio_dir.mkdir(parents=True, exist_ok=True)
+
+    def _artifact_path(self, *, directory: Path, title: str | None, pdf_path: Path, extension: str) -> Path:
+        stem = _slugify_title(title or pdf_path.stem)
+        candidate = directory / f"{stem}.{extension}"
+        counter = 2
+        while candidate.exists():
+            candidate = directory / f"{stem}_{counter}.{extension}"
+            counter += 1
+        return candidate
 
     def _shorten_script(self, *, original_prompt: str, script: str, attempt: int) -> str:
         if len(script) <= MAX_SCRIPT_CHARS:
@@ -99,7 +109,12 @@ class PaperPodsPipeline:
             if self._tts is None:
                 raise RuntimeError("ELEVENLABS_API_KEY is required for audio generation.")
             logger.info("Generating missing audio from cached script for job %s", cached_script_job.id)
-            audio_path = self._audio_dir / f"{cached_script_job.id}.mp3"
+            audio_path = self._artifact_path(
+                directory=self._audio_dir,
+                title=cached_script_job.title,
+                pdf_path=Path(cached_script_job.pdf_path),
+                extension="mp3",
+            )
             script = Path(cached_script_job.script_path).read_text(encoding="utf-8")
             self._tts.synthesize(text=script, output_path=audio_path)
             self._store.update_job(cached_script_job.id, status="completed", audio_path=audio_path, error=None)
@@ -120,11 +135,12 @@ class PaperPodsPipeline:
             style=style,
             formula_policy=formula_policy,
         )
-        self._store.update_job(job_id, status="running")
-
         try:
+            self._store.update_job(job_id, status="running", title=title)
             logger.info("Extracting PDF text for %s", pdf_path)
             paper = extract_pdf_text(pdf_path)
+            paper_title = title or paper.title
+            self._store.update_job(job_id, status="running", title=paper_title)
             system_prompt, user_prompt = build_script_messages(
                 paper,
                 title_override=title,
@@ -141,7 +157,13 @@ class PaperPodsPipeline:
             script = self._normalize_script_length(script)
             logger.info("Generated script length: %s chars", len(script))
 
-            script_path = self._script_dir / f"{job_id}.txt"
+            title_for_artifacts = title or paper.title
+            script_path = self._artifact_path(
+                directory=self._script_dir,
+                title=title_for_artifacts,
+                pdf_path=pdf_path,
+                extension="txt",
+            )
             script_path.write_text(script, encoding="utf-8")
 
             audio_path: Path | None = None
@@ -149,12 +171,18 @@ class PaperPodsPipeline:
                 if self._tts is None:
                     raise RuntimeError("ELEVENLABS_API_KEY is required for audio generation.")
                 logger.info("Waiting for ElevenLabs audio generation for job %s", job_id)
-                audio_path = self._audio_dir / f"{job_id}.mp3"
+                audio_path = self._artifact_path(
+                    directory=self._audio_dir,
+                    title=title_for_artifacts,
+                    pdf_path=pdf_path,
+                    extension="mp3",
+                )
                 self._tts.synthesize(text=script, output_path=audio_path)
 
             self._store.update_job(
                 job_id,
                 status="completed",
+                title=title_for_artifacts,
                 script_path=script_path,
                 audio_path=audio_path,
                 error=None,
@@ -163,6 +191,15 @@ class PaperPodsPipeline:
         except Exception as exc:
             self._store.update_job(job_id, status="failed", error=str(exc))
             raise
+
+
+def _slugify_title(value: str | None) -> str:
+    cleaned = (value or "paper").strip()
+    if not cleaned:
+        cleaned = "paper"
+    normalized = re.sub(r"[^A-Za-z0-9]+", "_", cleaned)
+    slug = re.sub(r"_+", "_", normalized).strip("_").lower()
+    return slug[:80] or "paper"
 
 
 def _hash_file(path: Path) -> str:

@@ -111,5 +111,15 @@ def show_script(
         typer.echo(script_path.read_text(encoding="utf-8"))
 
 
+@app.command("tui")
+def tui() -> None:
+    """Open a lightweight terminal UI to browse generated scripts and audio."""
+    from .tui import PaperPodsBrowserApp
+
+    settings = load_settings()
+    app_instance = PaperPodsBrowserApp(data_dir=settings.data_dir)
+    app_instance.run()
+
+
 if __name__ == "__main__":
     app()
