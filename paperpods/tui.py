@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 from textual.app import App, ComposeResult
@@ -124,7 +125,7 @@ class PaperPodsBrowserApp(App):
                 yield Static("Select a paper to inspect its files.", id="details")
                 with Vertical(id="progress-panel"):
                     yield Static("Progress", classes="section-title")
-                    yield ProgressBar(total=100, id="progress")
+                    yield ProgressBar(total=100, show_eta=False, id="progress")
                     yield Static("Idle", id="progress-status")
                 with Horizontal(id="actions"):
                     yield Button("Open script", id="open_script", variant="primary")
@@ -273,7 +274,8 @@ class PaperPodsBrowserApp(App):
 
         self._set_processing_state(True)
         self._set_progress(5, message="Preparing to process…")
-        self.run_worker(self._process_pdf_worker, pdf_path=pdf_path, generate_audio=generate_audio)
+        worker = partial(self._process_pdf_worker, pdf_path=pdf_path, generate_audio=generate_audio)
+        self.run_worker(worker, thread=True)
 
     def _process_pdf_worker(self, *, pdf_path: Path, generate_audio: bool) -> None:
         try:
