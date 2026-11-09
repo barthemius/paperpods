@@ -84,6 +84,31 @@ def test_pipeline_process_failure_updates_job(monkeypatch: pytest.MonkeyPatch, t
     assert "llm failed" in (jobs[0].error or "")
 
 
+def test_pipeline_marks_job_running_before_extraction(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from paperpods import pipeline as pipeline_module
+
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    store = JobStore(tmp_path / "paperpods.db")
+    observed_status: dict[str, str | None] = {"status": None}
+
+    def fake_extract(_path: Path) -> ExtractedPaper:
+        jobs = store.list_jobs(limit=1)
+        observed_status["status"] = jobs[0].status if jobs else None
+        return ExtractedPaper(
+            title="Paper",
+            text="Paper content",
+            formula_snippets=[],
+        )
+
+    monkeypatch.setattr(pipeline_module, "extract_pdf_text", fake_extract)
+    pipeline = PaperPodsPipeline(data_dir=tmp_path, store=store, llm=FakeLLM(), tts=None)
+
+    pipeline.process(pdf_path=pdf_path, generate_audio=False)
+
+    assert observed_status["status"] == "running"
+
+
 def test_pipeline_trims_script_to_max_characters() -> None:
     pipeline = PaperPodsPipeline(data_dir=Path("/tmp/paperpods-test"), store=JobStore(Path("/tmp/paperpods-test.db")), llm=FakeLLM(), tts=None)
     long_script = ("A " * 20_000) + "B"
@@ -91,7 +116,7 @@ def test_pipeline_trims_script_to_max_characters() -> None:
     trimmed = pipeline._normalize_script_length(long_script)
 
     assert len(trimmed) <= 10_000
-    assert trimmed.endswith(".") or trimmed.endswith("B") or trimmed.endswith(" ") is not True
+    assert trimmed == trimmed.rstrip()
 
 
 def test_delete_hanging_jobs_removes_incomplete_records(tmp_path: Path) -> None:
@@ -135,9 +160,9 @@ def test_delete_hanging_jobs_removes_incomplete_records(tmp_path: Path) -> None:
 
     removed = store.delete_hanging_jobs()
 
-    assert removed == 2
+    assert removed == 1
     assert store.get_job(good_id) is not None
-    assert store.get_job(dangling_id_1) is None
+    assert store.get_job(dangling_id_1) is not None
     assert store.get_job(dangling_id_2) is None
 
 

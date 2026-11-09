@@ -136,6 +136,7 @@ class PaperPodsPipeline:
             formula_policy=formula_policy,
         )
         try:
+            self._store.update_job(job_id, status="running", title=title)
             logger.info("Extracting PDF text for %s", pdf_path)
             paper = extract_pdf_text(pdf_path)
             paper_title = title or paper.title

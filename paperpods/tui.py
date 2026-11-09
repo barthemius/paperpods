@@ -266,21 +266,22 @@ class PaperPodsBrowserApp(App):
         if self.selected_pdf_path.suffix.lower() != ".pdf":
             self.notify("The selected file is not a PDF.", severity="error")
             return
+        pdf_path = self.selected_pdf_path
 
         self._set_processing_state(True)
         self._set_progress(5, message="Preparing to process…")
-        self.run_worker(self._process_pdf_worker, generate_audio=generate_audio)
+        self.run_worker(self._process_pdf_worker, pdf_path=pdf_path, generate_audio=generate_audio)
 
-    def _process_pdf_worker(self, *, generate_audio: bool) -> None:
+    def _process_pdf_worker(self, *, pdf_path: Path, generate_audio: bool) -> None:
         try:
             self.call_from_thread(self._set_progress, 15, message="Loading settings…")
             settings = load_settings()
             self.call_from_thread(self._set_progress, 35, message="Building pipeline…")
             pipeline = build_pipeline(settings)
             self.call_from_thread(self._set_progress, 55, message="Processing document…")
-            result = pipeline.process(pdf_path=self.selected_pdf_path, generate_audio=generate_audio)
+            result = pipeline.process(pdf_path=pdf_path, generate_audio=generate_audio)
             self.call_from_thread(self._set_progress, 100, message="Finalizing output…")
-            self.call_from_thread(self.notify, f"Processing {self.selected_pdf_path.name}; job={result.job_id}")
+            self.call_from_thread(self.notify, f"Processing {pdf_path.name}; job={result.job_id}")
             self.call_from_thread(self.refresh_jobs)
         except Exception as exc:  # pragma: no cover - UI feedback path
             self.call_from_thread(self.notify, f"Could not process PDF: {exc}", severity="error")

@@ -151,7 +151,7 @@ class JobStore:
                 DELETE FROM jobs
                 WHERE script_path IS NULL
                   AND audio_path IS NULL
-                  AND status IN ('queued', 'running', 'failed', 'cancelled', 'aborted')
+                  AND status IN ('queued', 'running')
                 """
             )
             return cursor.rowcount
