@@ -254,6 +254,9 @@ class PaperPodsBrowserApp(App):
             self.open_file(Path(self.selected_entry.script_path))
 
     def clean_hanging_records(self) -> None:
+        if self.is_processing:
+            self.notify("Cleanup is disabled while processing is active.", severity="warning")
+            return
         store = JobStore(self.data_dir / "paperpods.db")
         removed = store.delete_hanging_jobs()
         self.notify(f"Removed {removed} hanging records.")

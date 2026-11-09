@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -144,6 +145,21 @@ def test_delete_hanging_jobs_removes_incomplete_records(tmp_path: Path) -> None:
     )
     store.update_job(dangling_id_1, status="failed")
 
+    stale_queued_id = store.create_job(
+        pdf_path=tmp_path / "queued-stale.pdf",
+        pdf_sha256="queuedstalehash",
+        title="Queued stale",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+    with store._connect() as conn:
+        conn.execute(
+            "UPDATE jobs SET updated_at = ? WHERE id = ?",
+            ((datetime.now(UTC) - timedelta(minutes=30)).isoformat(), stale_queued_id),
+        )
+
     dangling_id_2 = store.create_job(
         pdf_path=tmp_path / "dangling-2.pdf",
         pdf_sha256="danglinghash2",
@@ -155,15 +171,27 @@ def test_delete_hanging_jobs_removes_incomplete_records(tmp_path: Path) -> None:
     )
     store.update_job(dangling_id_2, status="running")
 
+    fresh_queued_id = store.create_job(
+        pdf_path=tmp_path / "queued-fresh.pdf",
+        pdf_sha256="queuedfreshhash",
+        title="Queued fresh",
+        provider="fake",
+        model="fake",
+        style="single",
+        formula_policy="conceptual",
+    )
+
     remaining = store.list_jobs(limit=50)
-    assert len(remaining) == 3
+    assert len(remaining) == 5
 
     removed = store.delete_hanging_jobs()
 
     assert removed == 1
     assert store.get_job(good_id) is not None
     assert store.get_job(dangling_id_1) is not None
-    assert store.get_job(dangling_id_2) is None
+    assert store.get_job(dangling_id_2) is not None
+    assert store.get_job(stale_queued_id) is None
+    assert store.get_job(fresh_queued_id) is not None
 
 
 def test_pipeline_reuses_cached_script_without_regenerating(

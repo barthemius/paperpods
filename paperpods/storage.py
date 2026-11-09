@@ -144,15 +144,19 @@ class JobStore:
             return job
         return None
 
-    def delete_hanging_jobs(self) -> int:
+    def delete_hanging_jobs(self, *, stale_minutes: int = 10) -> int:
+        stale_cutoff = datetime.now(UTC).timestamp() - (stale_minutes * 60)
+        stale_cutoff_iso = datetime.fromtimestamp(stale_cutoff, tz=UTC).isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
                 """
                 DELETE FROM jobs
                 WHERE script_path IS NULL
                   AND audio_path IS NULL
-                  AND status IN ('queued', 'running')
-                """
+                  AND status = 'queued'
+                  AND updated_at <= ?
+                """,
+                (stale_cutoff_iso,),
             )
             return cursor.rowcount
 
