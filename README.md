@@ -18,7 +18,7 @@ Researchers often discover interesting papers while browsing, but cannot always 
 - Extracts paper text from PDF files
 - Uses an LLM to produce a 15–20 minute expert narration script
 - Explains equation intent conceptually and defines key variables
-- Renders MP3 audio via ElevenLabs for listenability
+- Renders spoken audio via ElevenLabs or Google Gemini TTS
 - Stores local job history and artifacts for reproducibility
 - Reuses cached results for the same paper
 - Names generated files by article title instead of opaque hashes when possible
@@ -61,7 +61,7 @@ uv tool install --editable .
 ## CLI commands
 
 - `paperpods process <pdf_path> [--title ...] [--audio]`
-- `paperpods tui` Open a lightweight browser for generated scripts and MP3s.
+- `paperpods tui` Open a lightweight browser for generated scripts and audio files.
 - `paperpods status <job_id>`
 - `paperpods list-jobs`
 - `paperpods show-script <job_id> [--print-content]`
@@ -69,11 +69,19 @@ uv tool install --editable .
 ## Environment variables
 
 - `PAPERPODS_DATA_DIR` (default: `~/.paperpods`)
-- `OPENAI_API_KEY` (required)
+- `PAPERPODS_LLM_PROVIDER` (`openai` or `gemini`; default: `openai`)
+- `OPENAI_API_KEY` (required when provider is `openai`)
 - `OPENAI_MODEL` (default: `gpt-4.1-mini`)
-- `ELEVENLABS_API_KEY` (required for audio generation)
+- `GEMINI_API_KEY` (required when provider is `gemini`, and also used by Gemini TTS)
+- `GEMINI_MODEL` (default: `gemini-2.5-flash`)
+- `PAPERPODS_TTS_PROVIDER` (`elevenlabs` or `gemini`; default: `elevenlabs`)
+- `ELEVENLABS_API_KEY` (required for audio generation when provider is `elevenlabs`)
 - `ELEVENLABS_VOICE_ID` (default: `EXAVITQu4vr4xnSDxMaL`)
 - `ELEVENLABS_MODEL_ID` (default: `eleven_multilingual_v2`)
+- `GEMINI_TTS_MODEL` (default: `gemini-3.8-flash-tts`)
+- `GEMINI_TTS_VOICE_NAME` (default: `Bodi`)
+- `GEMINI_TTS_STYLE` (optional style hint for Gemini speech metadata)
+- `GEMINI_TTS_OUTPUT_FORMAT` (`mp3` or `wav`; default: `mp3`, MP3 conversion requires `ffmpeg`)
 
 PaperPods automatically loads these from `.env` in the project directory.
 
@@ -84,4 +92,4 @@ PaperPods fingerprints each PDF and reuses existing script/audio artifacts from 
 ## Notes
 
 - The project includes a lightweight terminal UI for browsing generated scripts and audio files.
-- Provider abstraction is in place; OpenAI is the first concrete LLM backend.
+- Provider abstraction is in place for both LLM and TTS backends.

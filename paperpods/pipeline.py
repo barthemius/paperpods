@@ -10,7 +10,7 @@ from .llm.base import LLMProvider
 from .pdf_extract import extract_pdf_text
 from .prompts import build_script_messages
 from .storage import JobStore
-from .tts.elevenlabs import ElevenLabsTTS
+from .tts.base import TTSProvider
 
 
 @dataclass(slots=True)
@@ -27,11 +27,20 @@ logger = logging.getLogger("paperpods")
 
 
 class PaperPodsPipeline:
-    def __init__(self, *, data_dir: Path, store: JobStore, llm: LLMProvider, tts: ElevenLabsTTS | None) -> None:
+    def __init__(
+        self,
+        *,
+        data_dir: Path,
+        store: JobStore,
+        llm: LLMProvider,
+        tts: TTSProvider | None,
+        tts_provider_name: str = "elevenlabs",
+    ) -> None:
         self._data_dir = data_dir
         self._store = store
         self._llm = llm
         self._tts = tts
+        self._tts_provider_name = tts_provider_name
         self._script_dir = self._data_dir / "scripts"
         self._audio_dir = self._data_dir / "audio"
         self._script_dir.mkdir(parents=True, exist_ok=True)
@@ -107,13 +116,14 @@ class PaperPodsPipeline:
         )
         if generate_audio and cached_script_job and cached_script_job.script_path:
             if self._tts is None:
-                raise RuntimeError("ELEVENLABS_API_KEY is required for audio generation.")
+                api_key_var = "ELEVENLABS_API_KEY" if self._tts_provider_name == "elevenlabs" else "GEMINI_API_KEY" if self._tts_provider_name == "gemini" else "the provider API key"
+                raise RuntimeError(f"{self._tts_provider_name} TTS is not configured. Set {api_key_var} in your environment.")
             logger.info("Generating missing audio from cached script for job %s", cached_script_job.id)
             audio_path = self._artifact_path(
                 directory=self._audio_dir,
                 title=cached_script_job.title,
                 pdf_path=Path(cached_script_job.pdf_path),
-                extension="mp3",
+                extension=self._tts.audio_extension,
             )
             script = Path(cached_script_job.script_path).read_text(encoding="utf-8")
             self._tts.synthesize(text=script, output_path=audio_path)
@@ -169,13 +179,16 @@ class PaperPodsPipeline:
             audio_path: Path | None = None
             if generate_audio:
                 if self._tts is None:
-                    raise RuntimeError("ELEVENLABS_API_KEY is required for audio generation.")
-                logger.info("Waiting for ElevenLabs audio generation for job %s", job_id)
+                    raise RuntimeError(
+                        f"{self._tts_provider_name} TTS is not configured. "
+                        "Set the matching API key in your environment."
+                    )
+                logger.info("Waiting for %s audio generation for job %s", self._tts.provider_name, job_id)
                 audio_path = self._artifact_path(
                     directory=self._audio_dir,
                     title=title_for_artifacts,
                     pdf_path=pdf_path,
-                    extension="mp3",
+                    extension=self._tts.audio_extension,
                 )
                 self._tts.synthesize(text=script, output_path=audio_path)
 
