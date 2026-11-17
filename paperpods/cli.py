@@ -17,7 +17,7 @@ app = typer.Typer(help="PaperPods: scientific-paper to podcast-script/audio CLI.
 def process(
     pdf_path: Path = typer.Argument(..., help="Path to a scientific PDF."),
     title: str | None = typer.Option(None, help="Optional custom paper title."),
-    audio: bool = typer.Option(False, "--audio", help="Generate ElevenLabs MP3 output."),
+    audio: bool = typer.Option(False, "--audio", help="Generate spoken audio using the configured TTS provider."),
     style: str = typer.Option(
         "single-narrator-15-20min",
         help="Script style preset (single-narrator-15-20min, single-narrator-8-12min, two-host-dialogue-15-20min).",

@@ -6,6 +6,9 @@ from urllib import error, request
 
 
 class ElevenLabsTTS:
+    provider_name = "elevenlabs"
+    audio_extension = "mp3"
+
     def __init__(self, *, api_key: str, voice_id: str, model_id: str) -> None:
         self._api_key = api_key
         self._voice_id = voice_id
