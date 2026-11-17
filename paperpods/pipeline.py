@@ -116,10 +116,8 @@ class PaperPodsPipeline:
         )
         if generate_audio and cached_script_job and cached_script_job.script_path:
             if self._tts is None:
-                raise RuntimeError(
-                    f"{self._tts_provider_name} TTS is not configured. "
-                    "Set the matching API key in your environment."
-                )
+                api_key_var = "ELEVENLABS_API_KEY" if self._tts_provider_name == "elevenlabs" else "GEMINI_API_KEY" if self._tts_provider_name == "gemini" else "the provider API key"
+                raise RuntimeError(f"{self._tts_provider_name} TTS is not configured. Set {api_key_var} in your environment.")
             logger.info("Generating missing audio from cached script for job %s", cached_script_job.id)
             audio_path = self._artifact_path(
                 directory=self._audio_dir,
