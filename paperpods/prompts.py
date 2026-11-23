@@ -24,12 +24,21 @@ def build_script_messages(
     title_override: str | None,
     style: str,
     formula_policy: str,
+    script_length_mode: str = "capped",
 ) -> tuple[str, str]:
     style_text = SCRIPT_STYLE_GUIDANCE.get(style, SCRIPT_STYLE_GUIDANCE["single-narrator-15-20min"])
     formula_text = FORMULA_POLICY_GUIDANCE.get(
         formula_policy,
         FORMULA_POLICY_GUIDANCE["conceptual-plus-key-variables"],
     )
+    normalized_length_mode = script_length_mode.strip().lower()
+    if normalized_length_mode == "unlimited":
+        length_guidance = (
+            "Script length: unlimited. Prioritize depth and completeness over brevity, "
+            "and include richer methodological and results detail when supported by the paper."
+        )
+    else:
+        length_guidance = "Keep the final script under 10,000 characters total."
     paper_title = title_override or paper.title
     formula_examples = "\n".join(f"- {line}" for line in paper.formula_snippets[:10]) or "- (none detected)"
 
@@ -50,7 +59,7 @@ Constraints:
 - Avoid hallucinating results not in the source.
 - Include: motivation, method, core equations explained in words, main results, limitations, and practical implications.
 - Use plain spoken prose suitable for text-to-speech.
-- Keep the final script under 10,000 characters total.
+- {length_guidance}
 - Every symbol, equation, integral, sum, limit, derivative, matrix, fraction, vector, tensor and special function must be written in spoken English, never as raw mathematical notation.
 - Replace raw mathematical notation with explicit verbal descriptions such as:
   - "the integral from zero to infinity"
@@ -72,4 +81,3 @@ Paper content:
 {paper.text}
 """.strip()
     return system_prompt, user_prompt
-

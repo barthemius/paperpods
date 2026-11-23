@@ -252,6 +252,7 @@ class PaperPodsPipeline:
                 title_override=title,
                 style=style,
                 formula_policy=formula_policy,
+                script_length_mode=script_length_mode,
             )
             logger.info("Sending script generation request to %s/%s", self._llm.provider_name, self._llm.model_name)
             script = self._llm.generate_script(system_prompt=system_prompt, user_prompt=user_prompt)
