@@ -60,7 +60,7 @@ uv tool install --editable .
 
 ## CLI commands
 
-- `paperpods process <pdf_path> [--title ...] [--audio]`
+- `paperpods process <pdf_path> [--title ...] [--audio] [--script-length-mode capped|unlimited]`
 - `paperpods tui` Open a lightweight browser for generated scripts and audio files.
 - `paperpods status <job_id>`
 - `paperpods list-jobs`
@@ -70,6 +70,7 @@ uv tool install --editable .
 
 - `PAPERPODS_DATA_DIR` (default: `~/.paperpods`)
 - `PAPERPODS_LLM_PROVIDER` (`openai` or `gemini`; default: `openai`)
+- `PAPERPODS_SCRIPT_LENGTH_MODE` (`capped` or `unlimited`; default: `capped`)
 - `OPENAI_API_KEY` (required when provider is `openai`)
 - `OPENAI_MODEL` (default: `gpt-4.1-mini`)
 - `GEMINI_API_KEY` (required when provider is `gemini`, and also used by Gemini TTS)
@@ -80,7 +81,7 @@ uv tool install --editable .
 - `ELEVENLABS_MODEL_ID` (default: `eleven_multilingual_v2`)
 - `GEMINI_TTS_MODEL` (default: `gemini-3.8-flash-tts`)
 - `GEMINI_TTS_VOICE_NAME` (default: `Bodi`)
-- `GEMINI_TTS_STYLE` (optional style hint for Gemini speech metadata)
+- `GEMINI_TTS_STYLE` (Gemini speech style metadata; default: `natural, clear Received Pronunciation British English`)
 - `GEMINI_TTS_OUTPUT_FORMAT` (`mp3` or `wav`; default: `mp3`, MP3 conversion requires `ffmpeg`)
 
 PaperPods automatically loads these from `.env` in the project directory.

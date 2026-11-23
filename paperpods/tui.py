@@ -284,7 +284,11 @@ class PaperPodsBrowserApp(App):
             self.call_from_thread(self._set_progress, 35, message="Building pipeline…")
             pipeline = build_pipeline(settings)
             self.call_from_thread(self._set_progress, 55, message="Processing document…")
-            result = pipeline.process(pdf_path=pdf_path, generate_audio=generate_audio)
+            result = pipeline.process(
+                pdf_path=pdf_path,
+                generate_audio=generate_audio,
+                script_length_mode=settings.script_length_mode,
+            )
             self.call_from_thread(self._set_progress, 100, message="Finalizing output…")
             self.call_from_thread(self.notify, f"Processing {pdf_path.name}; job={result.job_id}")
             self.call_from_thread(self.refresh_jobs)
