@@ -199,8 +199,14 @@ class JobStore:
                 (pdf_sha256,),
             )
 
+        base_dir = self.db_path.parent.resolve()
         for artifact_path in artifact_paths:
-            artifact_path.unlink(missing_ok=True)
+            try:
+                resolved = artifact_path.expanduser().resolve()
+                resolved.relative_to(base_dir)
+            except (OSError, ValueError):
+                continue
+            resolved.unlink(missing_ok=True)
         return cursor.rowcount
 
 
