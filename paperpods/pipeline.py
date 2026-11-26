@@ -197,6 +197,8 @@ class PaperPodsPipeline:
                 pdf_sha256=pdf_hash,
                 require_audio=generate_audio,
             )
+        if cached_job and (cached_job.script_length_mode or "capped").strip().lower() != script_length_mode.strip().lower():
+            cached_job = None
         if cached_job:
             if not cached_job.script_path:
                 raise RuntimeError("Cache metadata is invalid: missing script_path.")
