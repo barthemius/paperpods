@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from hashlib import sha256
 from pathlib import Path
 
 import typer
@@ -26,13 +27,20 @@ def process(
         "conceptual-plus-key-variables",
         help="Formula policy (conceptual-plus-key-variables, high-level-only, detailed-derivation-summary).",
     ),
+    script_length_mode: str | None = typer.Option(
+        None,
+        "--script-length-mode",
+        help="Script length mode: capped (10k behavior) or unlimited (allow long script + chunked TTS).",
+    ),
     quiet: bool = typer.Option(False, "--quiet", help="Suppress high-level progress logs."),
+    force_rerun: bool = typer.Option(False, "--force-rerun", help="Ignore cached results and regenerate this paper."),
 ) -> None:
     log_level = logging.WARNING if quiet else logging.INFO
     logging.basicConfig(level=log_level, format="%(message)s")
     logger.setLevel(log_level)
 
     settings = load_settings()
+    selected_script_length_mode = script_length_mode or settings.script_length_mode
     logger.info("Loading PaperPods settings from environment.")
     pipeline = build_pipeline(settings)
     try:
@@ -42,6 +50,8 @@ def process(
             style=style,
             formula_policy=formula_policy,
             generate_audio=audio,
+            script_length_mode=selected_script_length_mode,
+            force_rerun=force_rerun,
         )
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
@@ -73,6 +83,25 @@ def status_command(job_id: str = typer.Argument(..., help="Job ID.")) -> None:
     typer.echo(f"updated_at={job.updated_at.isoformat()}")
     if job.error:
         typer.echo(f"error={job.error}")
+
+
+@app.command("clear-cache")
+def clear_cache(pdf_path: Path = typer.Argument(..., help="PDF whose cached jobs and artifacts should be removed.")) -> None:
+    if not pdf_path.exists():
+        raise typer.BadParameter(f"PDF not found: {pdf_path}")
+
+    hasher = sha256()
+    with pdf_path.open("rb") as handle:
+        while chunk := handle.read(8192):
+            hasher.update(chunk)
+    pdf_sha256 = hasher.hexdigest()
+    settings = load_settings()
+    store = JobStore(settings.data_dir / "paperpods.db")
+    removed = store.clear_cache_for_pdf(pdf_sha256=pdf_sha256)
+    if removed:
+        typer.echo(f"Cleared cache for {pdf_path}: {removed} job(s) removed.")
+    else:
+        typer.echo(f"No cached jobs found for {pdf_path}.")
 
 
 @app.command("list-jobs")

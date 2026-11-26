@@ -36,6 +36,8 @@ class JobStore:
                     model TEXT NOT NULL,
                     style TEXT,
                     formula_policy TEXT,
+                    script_length_mode TEXT,
+                    tts_chunk_chars INTEGER,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
@@ -48,6 +50,10 @@ class JobStore:
                 conn.execute("ALTER TABLE jobs ADD COLUMN style TEXT")
             if "formula_policy" not in columns:
                 conn.execute("ALTER TABLE jobs ADD COLUMN formula_policy TEXT")
+            if "script_length_mode" not in columns:
+                conn.execute("ALTER TABLE jobs ADD COLUMN script_length_mode TEXT")
+            if "tts_chunk_chars" not in columns:
+                conn.execute("ALTER TABLE jobs ADD COLUMN tts_chunk_chars INTEGER")
 
     def create_job(
         self,
@@ -59,16 +65,31 @@ class JobStore:
         model: str,
         style: str,
         formula_policy: str,
+        script_length_mode: str | None = None,
+        tts_chunk_chars: int | None = None,
     ) -> str:
         now = _now_iso()
         job_id = uuid4().hex
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO jobs (id, status, pdf_path, pdf_sha256, title, script_path, audio_path, error, provider, model, style, formula_policy, created_at, updated_at)
-                VALUES (?, 'queued', ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?)
+                INSERT INTO jobs (id, status, pdf_path, pdf_sha256, title, script_path, audio_path, error, provider, model, style, formula_policy, script_length_mode, tts_chunk_chars, created_at, updated_at)
+                VALUES (?, 'queued', ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (job_id, str(pdf_path), pdf_sha256, title, provider, model, style, formula_policy, now, now),
+                (
+                    job_id,
+                    str(pdf_path),
+                    pdf_sha256,
+                    title,
+                    provider,
+                    model,
+                    style,
+                    formula_policy,
+                    script_length_mode,
+                    tts_chunk_chars,
+                    now,
+                    now,
+                ),
             )
         return job_id
 
@@ -160,6 +181,34 @@ class JobStore:
             )
             return cursor.rowcount
 
+    def clear_cache_for_pdf(self, *, pdf_sha256: str) -> int:
+        artifact_paths: set[Path] = set()
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT script_path, audio_path FROM jobs WHERE pdf_sha256 = ?",
+                (pdf_sha256,),
+            ).fetchall()
+            for row in rows:
+                if row["script_path"]:
+                    artifact_paths.add(Path(row["script_path"]))
+                if row["audio_path"]:
+                    artifact_paths.add(Path(row["audio_path"]))
+
+            cursor = conn.execute(
+                "DELETE FROM jobs WHERE pdf_sha256 = ?",
+                (pdf_sha256,),
+            )
+
+        base_dir = self.db_path.parent.resolve()
+        for artifact_path in artifact_paths:
+            try:
+                resolved = artifact_path.expanduser().resolve()
+                resolved.relative_to(base_dir)
+            except (OSError, ValueError):
+                continue
+            resolved.unlink(missing_ok=True)
+        return cursor.rowcount
+
 
 def _row_to_job(row: sqlite3.Row) -> JobRecord:
     return JobRecord(
@@ -175,6 +224,8 @@ def _row_to_job(row: sqlite3.Row) -> JobRecord:
         model=row["model"],
         style=row["style"] if "style" in row.keys() else None,
         formula_policy=row["formula_policy"] if "formula_policy" in row.keys() else None,
+        script_length_mode=row["script_length_mode"] if "script_length_mode" in row.keys() else None,
+        tts_chunk_chars=row["tts_chunk_chars"] if "tts_chunk_chars" in row.keys() else None,
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
     )

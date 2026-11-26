@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from paperpods.app import build_pipeline
-from paperpods.config import Settings
+from paperpods.config import DEFAULT_GEMINI_TTS_STYLE, Settings, load_settings
 
 
 def _base_settings(tmp_path: Path) -> Settings:
@@ -14,6 +14,7 @@ def _base_settings(tmp_path: Path) -> Settings:
         openai_model="gpt-4.1-mini",
         gemini_api_key=None,
         gemini_model="gemini-2.5-flash",
+        script_length_mode="capped",
         tts_provider="elevenlabs",
         elevenlabs_api_key="eleven-key",
         elevenlabs_voice_id="voice",
@@ -75,3 +76,15 @@ def test_build_pipeline_rejects_unknown_tts_provider(tmp_path: Path) -> None:
     settings.tts_provider = "unknown-provider"
     with pytest.raises(RuntimeError, match="Unsupported PAPERPODS_TTS_PROVIDER"):
         build_pipeline(settings)
+
+
+def test_load_settings_defaults_to_british_gemini_tts_style(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GEMINI_TTS_STYLE", raising=False)
+
+    settings = load_settings()
+
+    assert settings.gemini_tts_style == DEFAULT_GEMINI_TTS_STYLE

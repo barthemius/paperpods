@@ -18,5 +18,7 @@ class JobRecord:
     model: str
     style: str | None
     formula_policy: str | None
+    script_length_mode: str | None
+    tts_chunk_chars: int | None
     created_at: datetime
     updated_at: datetime
