@@ -375,19 +375,28 @@ def _merge_audio_chunks(*, paths: list[Path], output_path: Path, extension: str)
 def _merge_wav_chunks(*, paths: list[Path], output_path: Path) -> None:
     with wave.open(str(paths[0]), "rb") as first:
         params = first.getparams()
-        frames = [first.readframes(first.getnframes())]
+        with wave.open(str(output_path), "wb") as output_wav:
+            output_wav.setparams(params)
+            output_wav.writeframes(first.readframes(first.getnframes()))
 
-    for path in paths[1:]:
-        with wave.open(str(path), "rb") as wav_file:
-            if wav_file.getparams()[:4] != params[:4]:
-                raise RuntimeError("WAV chunks use incompatible audio parameters; cannot merge safely.")
-            frames.append(wav_file.readframes(wav_file.getnframes()))
-
-    with wave.open(str(output_path), "wb") as output_wav:
-        output_wav.setparams(params)
-        for frame_data in frames:
-            output_wav.writeframes(frame_data)
-
+            for path in paths[1:]:
+                with wave.open(str(path), "rb") as wav_file:
+                    other = wav_file.getparams()
+                    if (
+                        other.nchannels,
+                        other.sampwidth,
+                        other.framerate,
+                        other.comptype,
+                    ) != (
+                        params.nchannels,
+                        params.sampwidth,
+                        params.framerate,
+                        params.comptype,
+                    ):
+                        raise RuntimeError(
+                            "WAV chunks use incompatible audio parameters; cannot merge safely."
+                        )
+                    output_wav.writeframes(wav_file.readframes(wav_file.getnframes()))
 
 def _merge_mp3_chunks_with_ffmpeg(*, paths: list[Path], output_path: Path) -> None:
     ffmpeg_path = shutil.which("ffmpeg")
