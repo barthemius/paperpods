@@ -127,7 +127,10 @@ class PaperPodsPipeline:
         chunks: list[str] = []
         for paragraph in [part.strip() for part in text.split("\n\n") if part.strip()]:
             if len(paragraph) <= max_chars:
-                chunks = _append_piece(chunks, paragraph, max_chars)
+                if chunks and len(chunks[-1]) + 2 + len(paragraph) <= max_chars:
+                    chunks[-1] = f"{chunks[-1]}\n\n{paragraph}"
+                else:
+                    chunks.append(paragraph)
                 continue
             sentence_parts = re.split(r"(?<=[.!?])\s+", paragraph)
             for sentence in [s.strip() for s in sentence_parts if s.strip()]:
