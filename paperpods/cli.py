@@ -90,7 +90,11 @@ def clear_cache(pdf_path: Path = typer.Argument(..., help="PDF whose cached jobs
     if not pdf_path.exists():
         raise typer.BadParameter(f"PDF not found: {pdf_path}")
 
-    pdf_sha256 = sha256(pdf_path.read_bytes()).hexdigest()
+    hasher = sha256()
+    with pdf_path.open("rb") as handle:
+        while chunk := handle.read(8192):
+            hasher.update(chunk)
+    pdf_sha256 = hasher.hexdigest()
     settings = load_settings()
     store = JobStore(settings.data_dir / "paperpods.db")
     removed = store.clear_cache_for_pdf(pdf_sha256=pdf_sha256)
